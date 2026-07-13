@@ -59,7 +59,19 @@ app, so a wasm that behaves here behaves in the app.
 
 ## Deploy
 
-TODO: pipeline to build and publish edited wasm game.
+CI builds and publishes the wasm automatically — `.github/workflows/build-wasm.yml`.
+
+On every push to `main` it detects which game crates changed and builds **only those**
+(a change under `autosplit-engine/` rebuilds **all** games, since every game depends on it),
+shrinks each wasm with `wasm-opt -Oz`, and publishes a per-game GitHub Release
+tagged with the game name (e.g. `celeste`), updating the asset in place. The Releases page is
+the list of every game's latest wasm. Pull requests build the changed games but don't release;
+_Run workflow_ (workflow_dispatch) can force-build everything (`all`) or a single `game`.
+
+Each game crate must carry its own `.cargo/config.toml` (target + rustflags) — copy
+`celeste-autosplitter/`'s — because CI builds from inside the crate dir with no `--target` flag.
+
+To ship a released wasm: download it and upload it as the game's autosplitter in momentum-back.
 
 ## Add a new game
 

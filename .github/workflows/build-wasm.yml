@@ -1,0 +1,225 @@
+name: Build & release WASM
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      all:
+        description: Force-build every game
+        type: boolean
+        default: false
+      game:
+        description: Build only this game (e.g. celeste); leave empty to auto-detect
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-wasm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      has_changes: ${{ steps.pick.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          FORCE_ALL: ${{ github.event.inputs.all }}
+          ONLY_GAME: ${{ github.event.inputs.game }}
+        run: |
+          set -euo pipefail
+
+          # All game crates: any *-autosplitter/ dir (testers/engine don't match).
+          games=()
+          for d in *-autosplitter/; do
+            [ -d "$d" ] || continue
+            games+=("${d%/}")
+          done
+          if [ ${#games[@]} -eq 0 ]; then
+            echo "No *-autosplitter crates found."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          build_all() {
+            local include=""
+            for c in "${games[@]}"; do
+              include="${include:+$include,}{\"crate\":\"$c\",\"game\":\"${c%-autosplitter}\"}"
+            done
+            echo "{\"include\":[$include]}"
+          }
+
+          # Manual: single game wins.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$ONLY_GAME" ]; then
+            crate="${ONLY_GAME%-autosplitter}-autosplitter"
+            if [ ! -d "$crate" ]; then
+              echo "::error::No such game crate: $crate"; exit 1
+            fi
+            echo "matrix={\"include\":[{\"crate\":\"$crate\",\"game\":\"${crate%-autosplitter}\"}]}" >> "$GITHUB_OUTPUT"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Manual force-all.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$FORCE_ALL" = "true" ]; then
+            echo "matrix=$(build_all)" >> "$GITHUB_OUTPUT"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Determine the diff base.
+          base=""
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            base="$BEFORE"
+          fi
+
+          # No usable base (first push / new branch / manual with no inputs) -> build all.
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "No usable diff base; building all games."
+            echo "matrix=$(build_all)" >> "$GITHUB_OUTPUT"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed="$(git diff --name-only "$base" "$SHA")"
+          echo "Changed files:"; echo "$changed"
+
+          # Engine or workflow change -> rebuild everything.
+          if echo "$changed" | grep -qE '^(autosplit-engine/|\.github/workflows/build-wasm\.yml$)'; then
+            echo "Shared change detected; building all games."
+            echo "matrix=$(build_all)" >> "$GITHUB_OUTPUT"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Otherwise: each game crate with a changed file under it.
+          include=""
+          for c in "${games[@]}"; do
+            if echo "$changed" | grep -qE "^$c/"; then
+              include="${include:+$include,}{\"crate\":\"$c\",\"game\":\"${c%-autosplitter}\"}"
+            fi
+          done
+
+          if [ -z "$include" ]; then
+            echo "No game crates changed."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"include\":[$include]}" >> "$GITHUB_OUTPUT"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: detect
+    if: needs.detect.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.crate }}
+
+      - name: Build wasm
+        run: |
+          set -euo pipefail
+          cd "${{ matrix.crate }}"
+          cargo build --release
+
+      - name: Optimize with wasm-opt
+        run: |
+          set -euo pipefail
+          crate="${{ matrix.crate }}"
+          art="${crate//-/_}"
+          src="$crate/target/wasm32-unknown-unknown/release/$art.wasm"
+          out="$GITHUB_WORKSPACE/$art.wasm"
+          before=$(stat -c%s "$src")
+
+          npm install -g wasm-opt >/dev/null 2>&1 || true
+          # -all keeps bleeding-edge features (tail-call, relaxed-simd, simd128) the crate enables.
+          if command -v wasm-opt >/dev/null && wasm-opt -all -Oz "$src" -o "$out"; then
+            after=$(stat -c%s "$out")
+            echo "OPT=wasm-opt -Oz" >> "$GITHUB_ENV"
+            echo "wasm-opt: $before -> $after bytes"
+          else
+            echo "::warning::wasm-opt unavailable or failed; shipping raw cargo build."
+            cp "$src" "$out"
+            after=$before
+            echo "OPT=raw (lto+strip)" >> "$GITHUB_ENV"
+          fi
+          echo "ART=$art" >> "$GITHUB_ENV"
+          echo "SIZE_KB=$(awk "BEGIN{printf \"%.1f\", $after/1024}")" >> "$GITHUB_ENV"
+
+      - name: Collect metadata
+        run: |
+          set -euo pipefail
+          crate="${{ matrix.crate }}"
+          ver=$(grep -m1 '^version' "$crate/Cargo.toml" | sed -E 's/.*"([^"]+)".*/\1/')
+          sha=$(sha256sum "$ART.wasm" | cut -d' ' -f1)
+          echo "VER=$ver" >> "$GITHUB_ENV"
+          echo "SHA256=$sha" >> "$GITHUB_ENV"
+          echo "BUILT=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_ENV"
+
+      - name: Write release notes
+        run: |
+          set -euo pipefail
+          game="${{ matrix.game }}"
+          title="$(printf '%s' "${game:0:1}" | tr '[:lower:]' '[:upper:]')${game:1}"
+          cat > notes.md <<EOF
+          ### $title autosplitter
+
+          | | |
+          |---|---|
+          | **Crate version** | $VER |
+          | **File** | \`$ART.wasm\` |
+          | **Size** | ${SIZE_KB} KB ($OPT) |
+          | **SHA-256** | \`$SHA256\` |
+          | **Source commit** | ${GITHUB_SHA:0:7} |
+          | **Built** | $BUILT |
+
+          Universal wasm — the split sequence is read at runtime from each category's \`.lss\`.
+          Upload this file as the game's autosplitter in momentum-back to ship it.
+          EOF
+          echo "TITLE=$title" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ART }}
+          path: ${{ env.ART }}.wasm
+
+      - name: Publish release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ matrix.game }}
+          name: ${{ env.TITLE }} autosplitter
+          body_path: notes.md
+          files: ${{ env.ART }}.wasm
+          make_latest: false
