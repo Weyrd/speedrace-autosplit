@@ -1,0 +1,11 @@
+[package]
+name = "autosplit-gui-tester"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Same runtime rev as autosplit-tester / momentum-app, pinned so behavior matches what ships.
+livesplit-auto-splitting = { git = "https://github.com/LiveSplit/livesplit-core", rev = "447403db330ae1bacda41bd19319077ea400d627" }
+roxmltree = "0.20"
+eframe = "0.29"
+rfd = "0.15"

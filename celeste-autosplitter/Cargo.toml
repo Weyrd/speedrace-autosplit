@@ -1,0 +1,33 @@
+[package]
+name = "celeste-autosplitter"
+version = "0.1.0"
+edition = "2021"
+
+# Memory-hunting probes (deaths/dashes, per-run strawberries, golden flag) were removed to keep
+# this crate clean; they're archived in PROBES.md with re-enable instructions.
+
+[features]
+# Dev-only per-transition state -> observe hook in game.rs
+# Build the wasm with "--features trace" in production builds omit it
+trace = []
+
+[dependencies]
+autosplit-engine = { path = "../autosplit-engine" }
+asr = { git = "https://github.com/LiveSplit/asr", features = [
+    "alloc",
+    "signature",
+    "flags",
+] }
+dlmalloc = { version = "0.2.4", features = ["global"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+panic = "abort"
+codegen-units = 1
+strip = true
+
+[profile.release.build-override]
+opt-level = 0

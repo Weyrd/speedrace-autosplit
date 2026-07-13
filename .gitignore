@@ -1,0 +1,17 @@
+
+target/
+target-gate/
+*.pdb
+
+bin/
+obj/
+.vs/
+*.user
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+.idea/
+*.swp
+*~
