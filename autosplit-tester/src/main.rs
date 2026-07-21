@@ -24,7 +24,7 @@ fn parse_split_names(content: &str) -> Vec<String> {
         .collect()
 }
 
-// Inner XML of <AutoSplitterSettings>, as momentum-app forwards it to the wasm
+// Inner XML of <AutoSplitterSettings>, as speedrace-app forwards it to the wasm
 fn autosplitter_settings(content: &str) -> Option<&str> {
     let start = content.find("<AutoSplitterSettings>")? + "<AutoSplitterSettings>".len();
     let len = content[start..].find("</AutoSplitterSettings>")?;

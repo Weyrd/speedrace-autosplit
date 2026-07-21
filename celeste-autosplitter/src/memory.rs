@@ -21,7 +21,8 @@ pub(crate) fn find_everest(process: &Process) -> Option<Backend> {
     for range in process.memory_ranges() {
         let Ok(r) = range.range() else { continue };
         if let Some(base) = EVEREST_MAGIC.scan_process_range(process, r) {
-            if process.read::<u8>(base + EV_VERSION).unwrap_or(0) >= EVEREST_MIN_VERSION {
+            let version = process.read::<u8>(base + EV_VERSION).unwrap_or(0);
+            if version >= EVEREST_MIN_VERSION && version != EV_VERSION_TORN {
                 asr::print_message(&format!("Everest info block @ {:X}", base.value()));
                 return Some(Backend::Everest { base });
             }
@@ -100,12 +101,18 @@ pub(crate) fn read_state(process: &Process, backend: &Backend) -> Option<GameSta
     let mut room = [0u8; 64];
     match backend {
         Backend::Everest { base } => {
+            // InfoVersion == 0xFF -> Everest is mid-update, skip this tick
+            if process.read::<u8>(*base + EV_VERSION).ok()? == EV_VERSION_TORN {
+                return None;
+            }
             let area = process.read::<i32>(*base + EV_CHAPTER_ID).ok()?;
             let mode = process.read::<i32>(*base + EV_CHAPTER_MODE).ok()?;
             let flags = process.read::<u32>(*base + EV_CHAPTER_FLAGS).ok()?;
+            let file_flags = process.read::<u32>(*base + EV_FILE_FLAGS).ok()?;
             let cassettes = process.read::<i32>(*base + EV_FILE_CASSETTES).ok()?;
             let hearts = process.read::<i32>(*base + EV_FILE_HEARTS).ok()?;
             let strawberries = process.read::<i32>(*base + EV_FILE_STRAWBERRIES).ok()?;
+            let chapter_strawberries = process.read::<i32>(*base + EV_CHAPTER_STRAWBERRIES).ok();
             // A bad time read must not drop the whole sample.
             let chapter_time_ms = process
                 .read::<i64>(*base + EV_CHAPTER_TIME)
@@ -130,6 +137,10 @@ pub(crate) fn read_state(process: &Process, backend: &Backend) -> Option<GameSta
                     }
                 }
             }
+            // Re-check
+            if process.read::<u8>(*base + EV_VERSION).ok()? == EV_VERSION_TORN {
+                return None;
+            }
             Some(GameState {
                 area,
                 mode,
@@ -141,10 +152,13 @@ pub(crate) fn read_state(process: &Process, backend: &Backend) -> Option<GameSta
                 cassettes,
                 hearts,
                 strawberries,
+                chapter_strawberries,
                 room,
                 room_len,
                 chapter_time_ms,
                 file_time_ms,
+                in_level: area != AREA_MENU,
+                file_active: file_flags & FILE_FLAG_ACTIVE != 0,
             })
         }
         Backend::Vanilla {
@@ -192,10 +206,13 @@ pub(crate) fn read_state(process: &Process, backend: &Backend) -> Option<GameSta
                 cassettes,
                 hearts,
                 strawberries,
+                chapter_strawberries: None,
                 room,
                 room_len,
                 chapter_time_ms,
                 file_time_ms,
+                in_level: area != AREA_MENU,
+                file_active: true,
             })
         }
     }

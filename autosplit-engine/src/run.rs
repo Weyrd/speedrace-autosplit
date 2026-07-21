@@ -13,7 +13,7 @@ use crate::Game;
 const STALE_TICKS: u32 = 600;
 
 pub async fn run<G: Game>() {
-    asr::print_message("Momentum autosplitter loaded");
+    asr::print_message("Speedrace autosplitter loaded");
     let mut game = G::new();
 
     loop {
@@ -66,6 +66,8 @@ pub async fn run<G: Game>() {
                             next_tick().await;
                             continue;
                         }
+
+                        game.maintain(&process, &backend, &state);
 
                         if let Some(prev) = &last {
                             game.observe(&state, prev);

@@ -27,7 +27,7 @@ pub trait Game: Sized {
 
     fn detect_backend(&self, process: &Process) -> Option<Self::Backend>;
 
-    fn read_state(&self, process: &Process, backend: &Self::Backend) -> Option<Self::State>;
+    fn read_state(&mut self, process: &Process, backend: &Self::Backend) -> Option<Self::State>;
 
     // prevent false positives
     fn is_consistent(&self, _state: &Self::State) -> bool {
@@ -58,6 +58,9 @@ pub trait Game: Sized {
 
     // In Game Time (mandatory)
     fn igt(&self, state: &Self::State, cfg: &Self::Config) -> Option<Duration>;
+
+    // Per tick upkeep (amortized pointer discovery)
+    fn maintain(&mut self, _process: &Process, _backend: &Self::Backend, _state: &Self::State) {}
 
     // Read + emit per-run counters
     fn update_counters(

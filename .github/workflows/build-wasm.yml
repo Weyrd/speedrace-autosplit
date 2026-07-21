@@ -205,7 +205,7 @@ jobs:
           | **Built** | $BUILT |
 
           Universal wasm — the split sequence is read at runtime from each category's \`.lss\`.
-          Upload this file as the game's autosplitter in momentum-back to ship it.
+          Upload this file as the game's autosplitter in speedrace-back to ship it.
           EOF
           echo "TITLE=$title" >> "$GITHUB_ENV"
 

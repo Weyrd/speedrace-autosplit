@@ -4,6 +4,7 @@ use autosplit_engine::counter::{Counter, EdgeCounter};
 use autosplit_engine::Game;
 
 use crate::consts::{AREA_MENU, VA_SESSION_DASHES, VA_SESSION_DEATHS};
+use crate::everest::EvChain;
 use crate::memory::{self, Backend};
 use crate::splits::{self, RunConfig};
 use crate::state::GameState;
@@ -18,6 +19,12 @@ pub(crate) struct Celeste {
     hearts: EdgeCounter,
     goldens: EdgeCounter,
     last_session: Option<Address>, // Last Session address seen (for stable read)
+
+    /* Everest */
+    ev: EvChain,
+    last_area: i32,
+    last_chapter_time_ms: i64,
+    ev_persist: Option<GameState>,
 }
 
 impl Game for Celeste {
@@ -37,6 +44,11 @@ impl Game for Celeste {
             hearts: EdgeCounter::new(),
             goldens: EdgeCounter::new(),
             last_session: None,
+            /* Everest */
+            ev: EvChain::new(),
+            last_area: AREA_MENU,
+            last_chapter_time_ms: 0,
+            ev_persist: None,
         }
     }
 
@@ -45,11 +57,45 @@ impl Game for Celeste {
     }
 
     fn detect_backend(&self, process: &Process) -> Option<Backend> {
-        memory::find_vanilla(process).or_else(|| memory::find_everest(process))
+        memory::find_everest(process).or_else(|| memory::find_vanilla(process))
     }
 
-    fn read_state(&self, process: &Process, backend: &Backend) -> Option<GameState> {
-        memory::read_state(process, backend)
+    fn read_state(&mut self, process: &Process, backend: &Backend) -> Option<GameState> {
+        let mut s = memory::read_state(process, backend)?;
+        if matches!(backend, Backend::Everest { .. }) {
+            if s.in_level {
+                self.ev_persist = Some(s);
+            } else if s.file_active {
+                if let Some(p) = &self.ev_persist {
+                    s.area = p.area;
+                    s.mode = p.mode;
+                    s.started = p.started;
+                    s.complete = p.complete;
+                    s.ch_cassette = p.ch_cassette;
+                    s.ch_heart = p.ch_heart;
+                    s.ch_golden = p.ch_golden;
+                    s.room = p.room;
+                    s.room_len = p.room_len;
+                    s.chapter_time_ms = p.chapter_time_ms;
+                }
+            } else {
+                // True main menu (no save loaded) -> reset
+                self.ev_persist = None;
+            }
+        }
+        Some(s)
+    }
+
+    // Everest: run the anchor chain
+    fn maintain(&mut self, process: &Process, backend: &Backend, s: &GameState) {
+        let Backend::Everest { base } = backend else {
+            return;
+        };
+        if s.in_level {
+            self.ev.tick(process, *base);
+        } else {
+            self.ev.idle_tick();
+        }
     }
 
     // guard: in a chapter the room name is never empty
@@ -103,6 +149,22 @@ impl Game for Celeste {
             }
             self.last_session = session;
         }
+
+        // Everest: deaths/dashes thoutgh anchor chain
+        if matches!(backend, Backend::Everest { .. }) && s.area != AREA_MENU {
+            let entered = self.last_area != s.area || s.chapter_time_ms < self.last_chapter_time_ms;
+            if entered && s.chapter_time_ms < 2_000 {
+                self.deaths.feed(Some(0));
+                self.dashes.feed(Some(0));
+            }
+            if let Some((d, da)) = self.ev.last {
+                self.deaths.feed(Some(d));
+                self.dashes.feed(Some(da));
+            }
+        }
+        self.last_area = s.area;
+        self.last_chapter_time_ms = s.chapter_time_ms;
+
         if let Some(v) = self.deaths.take_emit() {
             timer::set_variable("deaths", &format!("{v}"));
         }
@@ -113,7 +175,8 @@ impl Game for Celeste {
         // Collectibles come straight off AutosplitterInfo -> no need to read session
         if s.area != AREA_MENU {
             if matches!(backend, Backend::Everest { .. }) {
-                self.straws.feed(Some(s.strawberries));
+                // Everest Session.Strawberries.Count natively (0x48)
+                self.straws.feed(s.chapter_strawberries);
             }
             self.cassettes.feed(s.ch_cassette);
             self.hearts.feed(s.ch_heart);
@@ -144,6 +207,8 @@ impl Game for Celeste {
 
     fn reset_session(&mut self) {
         self.last_session = None;
+        self.ev.reset();
+        self.ev_persist = None;
     }
 
     fn reset_split_state(&mut self) {

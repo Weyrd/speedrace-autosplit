@@ -1,4 +1,4 @@
-# AutoSplitter Momentum WASM
+# AutoSplitter Speedrace WASM
 
 One `.wasm` per game. Read .lss file at run time.
 
@@ -7,7 +7,7 @@ One `.wasm` per game. Read .lss file at run time.
 | Folder                  | What it is                                                                                                                                                            |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `autosplit-engine/`     | Shared, game-agnostic core (the `Game` trait + `run` loop, timer/IGT contract, settings parsing, counters, .NET/Mono memory helpers). Every game crate depends on it. |
-| `autosplit-tester/`     | Native CLI host that mirrors momentum-app, loads a `.wasm` + a `.lss` and prints splits/vars.                                                                         |
+| `autosplit-tester/`     | Native CLI host that mirrors speedrace-app, loads a `.wasm` + a `.lss` and prints splits/vars.                                                                        |
 | `autosplit-gui-tester/` | Native GUI host (egui) -> same runtime as the app, with live counters, segment progress, and a filterable log.                                                        |
 
 ## Prerequisites (once)
@@ -71,7 +71,7 @@ _Run workflow_ (workflow_dispatch) can force-build everything (`all`) or a singl
 Each game crate must carry its own `.cargo/config.toml` (target + rustflags) — copy
 `celeste-autosplitter/`'s — because CI builds from inside the crate dir with no `--target` flag.
 
-To ship a released wasm: download it and upload it as the game's autosplitter in momentum-back.
+To ship a released wasm: download it and upload it as the game's autosplitter in speedrace-back.
 
 ## Add a new game
 

@@ -134,7 +134,7 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "Momentum Autosplit Tester",
+        "Speedrace Autosplit Tester",
         options,
         Box::new(|_cc| Ok(Box::new(App::new()))),
     )

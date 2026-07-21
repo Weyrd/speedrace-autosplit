@@ -10,6 +10,8 @@ use asr::signature::Signature;
 pub(crate) const EVEREST_MAGIC: Signature<20> =
     Signature::new("45 56 45 52 45 53 54 41 55 54 4F 53 50 4C 49 54 F0 F1 F2 F3");
 pub(crate) const EVEREST_MIN_VERSION: u8 = 3;
+// Everest InfoVersion
+pub(crate) const EV_VERSION_TORN: u8 = 0xFF;
 
 // Offsets inside Everest's CoreAutoSplitterInfo
 pub(crate) const EV_VERSION: u64 = 0x17;
@@ -17,12 +19,23 @@ pub(crate) const EV_CHAPTER_ID: u64 = 0x30;
 pub(crate) const EV_CHAPTER_MODE: u64 = 0x34;
 pub(crate) const EV_ROOM_PTR: u64 = 0x38;
 pub(crate) const EV_CHAPTER_FLAGS: u64 = 0x4c;
+// CoreAutoSplitterInfo.ChapterStrawberries = lvl.Session.Strawberries.Count (per-run, like vanilla)
+pub(crate) const EV_CHAPTER_STRAWBERRIES: u64 = 0x48;
+
+// --- Everest (64-bit .NET Core)  2026-07-21 Everest stable 1.6397.0
+pub(crate) const EV_LEVEL_SESSION: u64 = 0x50; // Level.Session field
+pub(crate) const S_TIME_FROM_BASE: u64 = 0x78; // i64 tracks ChapterTime -> liveness check
+pub(crate) const S_DASHES_FROM_BASE: u64 = 0x84; // i32
+pub(crate) const S_DEATHS_FROM_BASE: u64 = 0x8C; // i32
 pub(crate) const EV_FILE_STRAWBERRIES: u64 = 0x58;
 pub(crate) const EV_FILE_CASSETTES: u64 = 0x60;
 pub(crate) const EV_FILE_HEARTS: u64 = 0x64;
 // CoreAutoSplitterInfo.{ChapterTime,FileTime}
 pub(crate) const EV_CHAPTER_TIME: u64 = 0x40;
 pub(crate) const EV_FILE_TIME: u64 = 0x50;
+
+pub(crate) const EV_FILE_FLAGS: u64 = 0x68;
+pub(crate) const FILE_FLAG_ACTIVE: u32 = 1 << 31;
 
 pub(crate) const FLAG_STARTED: u32 = 1 << 0;
 pub(crate) const FLAG_COMPLETE: u32 = 1 << 1;

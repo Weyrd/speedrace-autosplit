@@ -1,6 +1,6 @@
 # celeste-autosplitter
 
-Celeste `.wasm` auto splitter for Momentum -> one wasm for the whole game, split
+Celeste `.wasm` auto splitter for Speedrace -> one wasm for the whole game, split
 sequence at runtime by `.lss` file's `<AutoSplitterSettings>`.
 
 ```bash
@@ -28,5 +28,9 @@ memory helpers) lives in `../autosplit-engine`. This crate only supplies Celeste
 | `src/consts.rs` | every memory address / signature / offset                                             |
 | `src/state.rs`  | the backend-agnostic `GameState` snapshot                                             |
 | `src/memory.rs` | backend detection (vanilla sig-scan + Everest) + `read_state` + session reads         |
+| `src/everest.rs`| Everest deaths/dashes: amortized anchor discovery + per-tick chain read (see PROBES.md) |
 | `src/splits.rs` | the split grammar + evaluator (parsed from `<AutoSplitterSettings>`)                  |
 | `src/game.rs`   | `Celeste` — implements `autosplit_engine::Game`, owns the run counters                |
+
+Both backends report the same live counters via `timer::set_variable`: `deaths` and `dashes`
+(instant, from the managed `Session`), per-run `strawberries`, plus `cassettes`/`hearts`/`golden`.

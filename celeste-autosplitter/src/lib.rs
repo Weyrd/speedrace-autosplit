@@ -14,6 +14,8 @@ mod memory;
 mod splits;
 mod state;
 
+mod everest;
+
 async fn main() {
     autosplit_engine::run::<game::Celeste>().await;
 }
