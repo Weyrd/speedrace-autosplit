@@ -186,6 +186,7 @@ jobs:
           echo "VER=$ver" >> "$GITHUB_ENV"
           echo "SHA256=$sha" >> "$GITHUB_ENV"
           echo "BUILT=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_ENV"
+          echo "STAMP=$(date -u '+%Y-%m-%d-%H%M%S')" >> "$GITHUB_ENV"
 
       - name: Write release notes
         run: |
@@ -218,8 +219,8 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ matrix.game }}
-          name: ${{ env.TITLE }} autosplitter
+          tag_name: ${{ matrix.game }}-${{ env.STAMP }}
+          name: ${{ env.TITLE }} autosplitter ${{ env.STAMP }}
           body_path: notes.md
           files: ${{ env.ART }}.wasm
           make_latest: false
