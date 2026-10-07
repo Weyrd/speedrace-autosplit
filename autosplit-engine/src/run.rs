@@ -80,7 +80,7 @@ pub async fn run<G: Game>() {
                                     }
                                 }
                                 TimerState::Running => {
-                                    if game.should_reset(&state) {
+                                    if game.should_reset(&state, prev) {
                                         timer::reset();
                                     }
                                     let idx = timer::current_split_index().unwrap_or(0) as usize;

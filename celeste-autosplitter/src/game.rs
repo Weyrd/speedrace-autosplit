@@ -112,8 +112,8 @@ impl Game for Celeste {
     }
 
     // Player returned to the main menu -> clear states
-    fn should_reset(&self, s: &GameState) -> bool {
-        s.area == AREA_MENU
+    fn should_reset(&self, s: &GameState, p: &GameState) -> bool {
+        s.area == AREA_MENU && p.area != AREA_MENU && !p.complete
     }
 
     fn eval(&mut self, cfg: &RunConfig, idx: usize, s: &GameState, p: &GameState) -> bool {

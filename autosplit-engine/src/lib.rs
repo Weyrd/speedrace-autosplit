@@ -44,7 +44,7 @@ pub trait Game: Sized {
         false
     }
 
-    fn should_reset(&self, _state: &Self::State) -> bool {
+    fn should_reset(&self, _state: &Self::State, _prev: &Self::State) -> bool {
         false
     }
 
