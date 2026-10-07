@@ -9,6 +9,19 @@ use crate::memory::{self, Backend};
 use crate::splits::{self, RunConfig};
 use crate::state::GameState;
 
+fn carry_over(s: &mut GameState, p: &GameState) {
+    s.area = p.area;
+    s.mode = p.mode;
+    s.started = p.started;
+    s.complete = false;
+    s.ch_cassette = p.ch_cassette;
+    s.ch_heart = p.ch_heart;
+    s.ch_golden = p.ch_golden;
+    s.room = p.room;
+    s.room_len = p.room_len;
+    s.chapter_time_ms = p.chapter_time_ms;
+}
+
 pub(crate) struct Celeste {
     exiting_chapter: bool,
 
@@ -67,16 +80,7 @@ impl Game for Celeste {
                 self.ev_persist = Some(s);
             } else if s.file_active {
                 if let Some(p) = &self.ev_persist {
-                    s.area = p.area;
-                    s.mode = p.mode;
-                    s.started = p.started;
-                    s.complete = p.complete;
-                    s.ch_cassette = p.ch_cassette;
-                    s.ch_heart = p.ch_heart;
-                    s.ch_golden = p.ch_golden;
-                    s.room = p.room;
-                    s.room_len = p.room_len;
-                    s.chapter_time_ms = p.chapter_time_ms;
+                    carry_over(&mut s, p);
                 }
             } else {
                 // True main menu (no save loaded) -> reset
