@@ -150,12 +150,13 @@ impl Game for Celeste {
             self.last_session = session;
         }
 
-        // Everest: deaths/dashes thoutgh anchor chain
+        // deaths/dashes thoutgh anchor chain
         if matches!(backend, Backend::Everest { .. }) && s.area != AREA_MENU {
             let entered = self.last_area != s.area || s.chapter_time_ms < self.last_chapter_time_ms;
             if entered && s.chapter_time_ms < 2_000 {
                 self.deaths.feed(Some(0));
                 self.dashes.feed(Some(0));
+                self.straws.feed(Some(0));
             }
             if let Some((d, da)) = self.ev.last {
                 self.deaths.feed(Some(d));
@@ -174,8 +175,8 @@ impl Game for Celeste {
 
         // Collectibles come straight off AutosplitterInfo -> no need to read session
         if s.area != AREA_MENU {
-            if matches!(backend, Backend::Everest { .. }) {
-                // Everest Session.Strawberries.Count natively (0x48)
+            if matches!(backend, Backend::Everest { .. }) && s.in_level {
+                // Session.Strawberries.Count natively (0x48)
                 self.straws.feed(s.chapter_strawberries);
             }
             self.cassettes.feed(s.ch_cassette);

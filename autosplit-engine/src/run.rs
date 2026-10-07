@@ -89,11 +89,11 @@ pub async fn run<G: Game>() {
                                         game.reset_split_state();
                                         last_idx = Some(idx);
                                     }
+                                    game.update_counters(&process, &backend, &state);
                                     if game.eval(&cfg, idx, &state, prev) {
                                         timer::split();
                                         game.reset_split_state();
                                     }
-                                    game.update_counters(&process, &backend, &state);
                                 }
                                 _ => {}
                             }
