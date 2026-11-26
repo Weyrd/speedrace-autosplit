@@ -266,7 +266,6 @@ pub(crate) fn parse_config(map: &settings::Map) -> Option<RunConfig> {
 
 fn chapter_split(
     exiting: &mut bool,
-    il_splits: bool,
     chapter_area: Option<i32>,
     s: &GameState,
     p: &GameState,
@@ -276,7 +275,7 @@ fn chapter_split(
         let credits_ok = chapter_area != Some(AREA_THE_SUMMIT)
             || (s.room_len > 0 && !starts_with_ignore_case(s.room(), b"credits"));
         *exiting = area_ok && s.complete && !p.complete && credits_ok;
-        *exiting && il_splits
+        *exiting
     } else {
         !s.complete && p.complete
     }
@@ -302,11 +301,11 @@ pub(crate) fn eval(
     };
     match def {
         SplitDef::Manual => false,
-        SplitDef::CompleteAny => chapter_split(exiting, il, None, s, p),
-        SplitDef::Complete { area } => chapter_split(exiting, il, Some(*area), s, p),
+        SplitDef::CompleteAny => chapter_split(exiting, None, s, p),
+        SplitDef::Complete { area } => chapter_split(exiting, Some(*area), s, p),
         SplitDef::CompleteArea { area, mode } => {
             let (area, mode) = (*area, *mode);
-            chapter_split(exiting, il, Some(area), s, p) && mode.is_none_or(|m| p.mode == m)
+            chapter_split(exiting, Some(area), s, p) && mode.is_none_or(|m| p.mode == m)
         }
         SplitDef::AreaEnter { area, mode } => {
             s.area != p.area
